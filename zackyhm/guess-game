@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Guess the Number Game</title>
+<style>
+  body{
+    font-family:sans-serif;
+    background:#0f1722;
+    color:#e6eef6;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    min-height:100vh;
+    margin:0
+  }
+  .card{
+    background:#0b1220;
+    padding:20px;
+    border-radius:12px;
+    width:320px;
+    text-align:center;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5);
+    margin:10px
+  }
+  input, button, select{
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    margin-top:10px;
+    width:80%
+  }
+  button{
+    cursor:pointer;
+    background:#06b6d4;
+    color:#052022;
+    font-weight:700;
+  }
+  table{
+    margin:10px auto;
+    border-collapse:collapse;
+    width:90%;
+    max-height:200px;
+    display:block;
+    overflow-y:auto;
+  }
+  th,td{
+    border:1px solid #06b6d4;
+    padding:6px;
+    text-align:center
+  }
+  .highlight{
+    background-color:#06b6d4;
+    color:#052022;
+    font-weight:bold;
+  }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="card" id="loginCard">
+  <h2>Enter your name to start!</h2>
+  <input type="text" id="playerName" placeholder="Your name">
+  <br>
+  <button onclick="login()">Start Game</button>
+</div>
+
+<!-- Game -->
+<div class="card" id="gameCard" style="display:none;">
+  <h1>🎯 Guess the Number Game</h1>
+  <p id="welcomeText"></p>
+
+  <label>Difficulty:
+    <select id="difficulty">
+      <option value="1">Easy (1–50)</option>
+      <option value="2">Medium (1–1000)</option>
+      <option value="3">Hard (1–1,000,000)</option>
+      <option value="4">No-Way (1–50,000,000,000,000)</option>
+    </select>
+  </label>
+  <br>
+  <input type="number" id="guessInput" placeholder="Enter a number">
+  <br>
+  <button onclick="startGame()">Start / Restart Game</button>
+  <button onclick="submitGuess()">Submit Guess</button>
+  <div id="log" style="margin-top:10px;min-height:60px"></div>
+  <div id="hintArea" style="margin-top:5px;font-weight:600"></div>
+  <div style="margin-top:10px;">Attempts left: <span id="attemptsLeft">-</span></div>
+</div>
+
+<!-- Leaderboard -->
+<div class="card" id="leaderboardCard" style="display:none;">
+  <h2>🏆 Leaderboard</h2>
+  <table id="leaderboard">
+    <tr><th>Player</th><th>Attempts</th></tr>
+  </table>
+</div>
+
+<script>
+let playerName = '';
+let target = null;
+let attempts = 0;
+let maxAttempts = 10;
+let leaderboard = [];
+let lastPlayer = '';
+
+// Load leaderboard from localStorage
+if(localStorage.getItem('leaderboard')){
+  leaderboard = JSON.parse(localStorage.getItem('leaderboard'));
+}
+
+function login(){
+  const nameInput = document.getElementById('playerName');
+  if(nameInput.value.trim() === ''){
+    alert('Please enter your name!');
+    return;
+  }
+  playerName = nameInput.value.trim();
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('gameCard').style.display = 'block';
+  document.getElementById('leaderboardCard').style.display = 'block';
+  document.getElementById('welcomeText').textContent = `Welcome, ${playerName}! Choose a difficulty and start guessing.`;
+  renderLeaderboard();
+}
+
+const ranges = {1:50,2:1000,3:1000000,4:50000000000000};
+
+function startGame(){
+  const level = parseInt(document.getElementById('difficulty').value);
+  target = Math.floor(Math.random() * ranges[level]) + 1;
+  attempts = 0;
+  maxAttempts = (level < 4) ? 10 : 20;
+  document.getElementById('log').innerHTML = `I've picked a number between 1 and ${ranges[level].toLocaleString()}. You have ${maxAttempts} tries.`;
+  document.getElementById('attemptsLeft').textContent = maxAttempts;
+  document.getElementById('hintArea').textContent = '';
+  document.getElementById('guessInput').value = '';
+}
+
+function submitGuess(){
+  if(target === null){
+    alert('Start the game first!');
+    return;
+  }
+  const guess = Number(document.getElementById('guessInput').value);
+  if(!Number.isFinite(guess) || guess <= 0){
+    alert('Enter a valid positive number!');
+    return;
+  }
+  attempts++;
+  document.getElementById('attemptsLeft').textContent = Math.max(0,maxAttempts-attempts);
+
+  if(guess === target){
+    document.getElementById('log').innerHTML = `🔥 Congrats ${playerName}! You guessed correctly in ${attempts} tries! The number was ${target}.`;
+    addScore(playerName, attempts);
+    target = null;
+    return;
+  }
+
+  const diff = Math.abs(guess - target);
+  const level = parseInt(document.getElementById('difficulty').value);
+  const percent = diff / ranges[level];
+
+  if(percent < 0.01) document.getElementById('hintArea').textContent = '⚡ Very close!';
+  else if(percent < 0.05) document.getElementById('hintArea').textContent = '🙂 Close';
+  else document.getElementById('hintArea').textContent = guess < target ? '⬆️ Too low!' : '⬇️ Too high!';
+
+  document.getElementById('log').innerHTML = `You guessed ${guess}. ${document.getElementById('hintArea').textContent}`;
+
+  if(attempts >= maxAttempts){
+    document.getElementById('log').innerHTML += `<br>💀 Game over! The correct number was ${target}.`;
+    addScore(playerName, attempts);
+    target = null;
+  }
+}
+
+// Cumulative leaderboard + localStorage
+function addScore(name, attemptCount){
+  leaderboard.push({player:name, attempts:attemptCount});
+  lastPlayer = name;
+  localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+  renderLeaderboard();
+}
+
+function renderLeaderboard(){
+  const table = document.getElementById('leaderboard');
+  table.innerHTML = '<tr><th>Player</th><th>Attempts</th></tr>';
+  leaderboard.sort((a,b)=>a.attempts-b.attempts);
+  leaderboard.forEach(entry=>{
+    const row = table.insertRow();
+    row.insertCell(0).textContent = entry.player;
+    row.insertCell(1).textContent = entry.attempts;
+    if(entry.player===lastPlayer){
+      row.classList.add('highlight');
+      row.scrollIntoView({behavior:"smooth", block:"end"});
+    }
+  });
+}
+</script>
+
+</body>
+</html>
